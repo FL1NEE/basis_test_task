@@ -84,12 +84,8 @@ func (r *TaskRepo) List(ctx context.Context, f TaskFilter) ([]domain.Task, error
 	return tasks, nil
 }
 
-// UpdateWithVersion applies the given field values only if the row is
-// still at expectedVersion, bumping the version by one. It reports
-// domain.ErrVersionMismatch if another update won the race in between the
-// caller reading the task and calling this method - the standard
-// optimistic-concurrency pattern, so a losing writer never silently
-// clobbers a winning one.
+// UpdateWithVersion is a CAS: it only applies if the row is still at
+// expectedVersion, otherwise domain.ErrVersionMismatch.
 func (r *TaskRepo) UpdateWithVersion(ctx context.Context, id int64, expectedVersion int, t *domain.Task) error {
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE tasks

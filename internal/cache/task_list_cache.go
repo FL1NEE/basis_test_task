@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/FL1NEE/basis_test_task/internal/domain"
+	"github.com/FL1NEE/basis_test_task/internal/metrics"
 	"github.com/redis/go-redis/v9"
 )
 
-// TaskListCache caches the result of a filtered task listing per team.
-// Invalidation uses a per-team generation counter instead of scanning and
-// deleting keys by pattern: every cache key embeds the team's current
-// generation, and invalidating a team is a single atomic INCR. Old
-// entries are simply never looked up again and expire on their own TTL.
+const cacheTypeTaskList = "task_list"
+
+// TaskListCache invalidates by bumping a per-team generation counter
+// embedded in every cache key, instead of scanning/deleting by pattern.
 type TaskListCache struct {
 	client *redis.Client
 	ttl    time.Duration
@@ -45,8 +45,6 @@ func (c *TaskListCache) entryKey(teamID int64, generation int64, status, assigne
 		teamID, generation, status, assigneeID, limit, offset)
 }
 
-// Get returns the cached task list for the given filter combination, or
-// (nil, false, nil) on a cache miss.
 func (c *TaskListCache) Get(ctx context.Context, teamID int64, status, assigneeID string, limit, offset int) ([]domain.Task, bool, error) {
 	generation, err := c.currentGeneration(ctx, teamID)
 	if err != nil {
@@ -55,6 +53,7 @@ func (c *TaskListCache) Get(ctx context.Context, teamID int64, status, assigneeI
 
 	raw, err := c.client.Get(ctx, c.entryKey(teamID, generation, status, assigneeID, limit, offset)).Bytes()
 	if errors.Is(err, redis.Nil) {
+		metrics.RecordCacheMiss(cacheTypeTaskList)
 		return nil, false, nil
 	}
 	if err != nil {
@@ -65,6 +64,7 @@ func (c *TaskListCache) Get(ctx context.Context, teamID int64, status, assigneeI
 	if err := json.Unmarshal(raw, &tasks); err != nil {
 		return nil, false, fmt.Errorf("decode cached task list: %w", err)
 	}
+	metrics.RecordCacheHit(cacheTypeTaskList)
 	return tasks, true, nil
 }
 
@@ -86,9 +86,6 @@ func (c *TaskListCache) Set(ctx context.Context, teamID int64, status, assigneeI
 	return nil
 }
 
-// InvalidateTeam bumps the team's cache generation, instantly making
-// every previously cached list for that team unreachable regardless of
-// which filter combination produced it.
 func (c *TaskListCache) InvalidateTeam(ctx context.Context, teamID int64) error {
 	if err := c.client.Incr(ctx, c.generationKey(teamID)).Err(); err != nil {
 		return fmt.Errorf("bump cache generation: %w", err)

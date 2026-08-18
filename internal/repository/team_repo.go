@@ -47,8 +47,6 @@ func (r *TeamRepo) GetByID(ctx context.Context, id int64) (*domain.Team, error) 
 	return &t, nil
 }
 
-// ListForUser returns every team the given user belongs to, including
-// their role in each, ordered by most recently created first.
 func (r *TeamRepo) ListForUser(ctx context.Context, userID int64) ([]domain.Team, error) {
 	var teams []domain.Team
 	err := r.db.SelectContext(ctx, &teams,
@@ -76,8 +74,6 @@ func (r *TeamRepo) AddMember(ctx context.Context, teamID, userID int64, role dom
 	return nil
 }
 
-// GetMemberRole returns the role of a user within a team, or
-// domain.ErrNotFound if the user is not a member.
 func (r *TeamRepo) GetMemberRole(ctx context.Context, teamID, userID int64) (domain.Role, error) {
 	var role domain.Role
 	err := r.db.GetContext(ctx, &role,

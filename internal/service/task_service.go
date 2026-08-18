@@ -24,7 +24,7 @@ type TaskService struct {
 	tasks   *repository.TaskRepo
 	history *repository.HistoryRepo
 	teamSvc *TeamService
-	cache   *cache.TaskListCache
+	cache   *cache.CachedTaskList
 }
 
 func NewTaskService(
@@ -32,7 +32,7 @@ func NewTaskService(
 	tasks *repository.TaskRepo,
 	history *repository.HistoryRepo,
 	teamSvc *TeamService,
-	taskCache *cache.TaskListCache,
+	taskCache *cache.CachedTaskList,
 ) *TaskService {
 	return &TaskService{db: db, tasks: tasks, history: history, teamSvc: teamSvc, cache: taskCache}
 }
@@ -136,8 +136,7 @@ func cacheFilterKeys(status *domain.TaskStatus, assigneeID *int64) (string, stri
 	return statusKey, assigneeKey
 }
 
-// TaskPatch carries only the fields the caller wants to change. A nil
-// field means "leave as-is".
+// TaskPatch: nil field means "leave as-is".
 type TaskPatch struct {
 	Title       *string
 	Description *string
@@ -149,10 +148,6 @@ func (p TaskPatch) empty() bool {
 	return p.Title == nil && p.Description == nil && p.Status == nil && p.AssigneeID == nil
 }
 
-// UpdateTask applies patch to the task, enforcing the role rules from the
-// spec, optimistic concurrency via expectedVersion, and recording a
-// history entry for every field that actually changed - all inside one
-// transaction so the task row and its audit trail never diverge.
 func (s *TaskService) UpdateTask(ctx context.Context, actingUserID, taskID int64, expectedVersion int, patch TaskPatch) (*domain.Task, error) {
 	if patch.empty() {
 		return nil, fmt.Errorf("%w: no fields to update", domain.ErrValidation)
@@ -224,8 +219,9 @@ func (s *TaskService) UpdateTask(ctx context.Context, actingUserID, taskID int64
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once committed
 
-	taskRepo := repository.NewTaskRepo(tx)
-	historyRepo := repository.NewHistoryRepo(tx)
+	txDB := repository.Instrument(tx)
+	taskRepo := repository.NewTaskRepo(txDB)
+	historyRepo := repository.NewHistoryRepo(txDB)
 
 	if err := taskRepo.UpdateWithVersion(ctx, taskID, expectedVersion, &updated); err != nil {
 		return nil, err

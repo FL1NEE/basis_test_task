@@ -6,13 +6,16 @@ SQL-отчёт по команде.
 
 ## Стек
 
-- Go 1.23, стандартный `net/http` (роутинг через `http.ServeMux` с
+- Go 1.25, стандартный `net/http` (роутинг через `http.ServeMux` с
   method+path паттернами, без стороннего роутера)
-- MySQL 8 (`database/sql` + `sqlx`, без ORM)
-- Redis (`go-redis/v9`)
+- MySQL 8 (`database/sql` + `sqlx`, без ORM) с connection pooling
+- Redis (`go-redis/v9`) с таймаутами, retry и circuit breaker
 - `golang-migrate` (миграции встроены в бинарник через `go:embed`,
   применяются автоматически при старте)
 - JWT (`golang-jwt/jwt/v5`), пароли — `bcrypt`
+- Prometheus metrics на `/metrics`
+- Structured logging с request_id и user_id
+- Graceful shutdown (15s timeout)
 - Docker / docker-compose
 
 ## Запуск
@@ -28,6 +31,7 @@ docker compose up --build
 
 Swagger UI: http://localhost:8080/docs
 OpenAPI-спека: http://localhost:8080/openapi.yaml
+Prometheus метрики: http://localhost:8080/metrics
 
 ### Локально без Docker
 
@@ -166,5 +170,25 @@ Docker.
   через `PUT /tasks/{id}` нет — можно только переназначить на другого
   участника команды.
 - Пагинация — offset/limit, не курсорная.
-- Rate limiting и circuit breaker не реализованы (в ТЗ отмечены как
-  "будет плюсом").
+- Rate limiting не реализован (в ТЗ отмечен как "будет плюсом").
+
+## Production-ready возможности (Senior+)
+
+**Resilience & Performance:**
+- **Graceful shutdown** — корректное завершение с 15s timeout для дообработки запросов
+- **Connection pooling** — MySQL с настроенными limits (max 25 open, 10 idle, 5min lifetime)
+- **Redis timeouts** — dial/read/write по 3-5s, max 3 retry, pool size 10
+- **Circuit breaker** — автоматический fallback при недоступности Redis (5 ошибок → open на 30s)
+- **HTTP timeouts** — ReadHeaderTimeout 5s, ReadTimeout 10s, WriteTimeout 15s, IdleTimeout 60s
+
+**Observability:**
+- **Prometheus metrics** — `/metrics` endpoint с метриками:
+  - `http_requests_total` (method, path, status)
+  - `http_request_duration_seconds` (histogram)
+  - `cache_hits_total` / `cache_misses_total`
+  - `db_queries_total` / `db_query_duration_seconds`
+- **Structured logging** — `slog` с контекстными полями:
+  - `request_id` (X-Request-ID header или auto-generated UUID)
+  - `user_id` (из JWT claims)
+  - `method`, `path`, `status`, `duration_ms`
+- **Request tracing** — каждый запрос получает уникальный request_id для корреляции логов

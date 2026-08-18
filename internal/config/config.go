@@ -7,9 +7,6 @@ import (
 	"time"
 )
 
-// Config holds every runtime setting the service needs. Nothing is
-// hardcoded: every field is read from the environment, with a sane local
-// default for development.
 type Config struct {
 	HTTPPort string
 

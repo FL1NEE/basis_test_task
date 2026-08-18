@@ -2,9 +2,6 @@ package domain
 
 import "errors"
 
-// Sentinel errors returned by the service layer. HTTP handlers translate
-// these into status codes; they never leak SQL or persistence details to
-// the client.
 var (
 	ErrNotFound           = errors.New("not found")
 	ErrUnauthorized       = errors.New("missing or invalid authorization token")

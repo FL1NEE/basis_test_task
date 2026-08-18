@@ -13,11 +13,8 @@ type historyHandler struct {
 	history *service.HistoryService
 }
 
-// taskHistoryEntryResponse mirrors domain.TaskHistory but exposes Changes
-// as json.RawMessage: the repository stores/returns it as a plain string
-// of raw JSON, and marshaling a Go string field verbatim would double-encode
-// it into a JSON string (`"{\"status\":...}"`) instead of a nested object
-// (`{"status":...}`), which is what the OpenAPI schema promises callers.
+// Changes is json.RawMessage, not string, so it embeds as a nested
+// object instead of double-encoding into an escaped JSON string.
 type taskHistoryEntryResponse struct {
 	ID        int64           `json:"id"`
 	TaskID    int64           `json:"task_id"`

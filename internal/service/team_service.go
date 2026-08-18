@@ -21,9 +21,6 @@ func NewTeamService(db *sqlx.DB, teams *repository.TeamRepo, users *repository.U
 	return &TeamService{db: db, teams: teams, users: users}
 }
 
-// CreateTeam creates the team and adds the creator as its owner in a
-// single transaction: a team without its owner membership row (or vice
-// versa) would be a broken state no caller could recover from.
 func (s *TeamService) CreateTeam(ctx context.Context, userID int64, name string) (int64, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -36,7 +33,7 @@ func (s *TeamService) CreateTeam(ctx context.Context, userID int64, name string)
 	}
 	defer tx.Rollback() //nolint:errcheck // no-op once committed
 
-	teamRepo := repository.NewTeamRepo(tx)
+	teamRepo := repository.NewTeamRepo(repository.Instrument(tx))
 
 	teamID, err := teamRepo.Create(ctx, name, userID)
 	if err != nil {
@@ -56,11 +53,8 @@ func (s *TeamService) ListMyTeams(ctx context.Context, userID int64) ([]domain.T
 	return s.teams.ListForUser(ctx, userID)
 }
 
-// InviteMember adds userEmail to teamID with the given role. Only an
-// owner or admin may invite. The owner role can never be granted through
-// this path, and neither an owner nor an admin can be re-assigned away
-// from owner here - team ownership transfer is out of scope for this
-// service.
+// InviteMember never grants or touches the owner role - ownership
+// transfer is out of scope.
 func (s *TeamService) InviteMember(ctx context.Context, actingUserID, teamID int64, targetEmail string, role domain.Role) error {
 	if !role.Valid() || role == domain.RoleOwner {
 		return fmt.Errorf("%w: invalid role for invite", domain.ErrValidation)
@@ -84,8 +78,6 @@ func (s *TeamService) InviteMember(ctx context.Context, actingUserID, teamID int
 
 	existingRole, err := s.teams.GetMemberRole(ctx, teamID, target.ID)
 	if err == nil {
-		// Already a member: treat this as a role change, but never let
-		// anyone touch the owner's membership through the invite path.
 		if existingRole == domain.RoleOwner {
 			return domain.ErrForbidden
 		}
@@ -98,10 +90,6 @@ func (s *TeamService) InviteMember(ctx context.Context, actingUserID, teamID int
 	return s.teams.AddMember(ctx, teamID, target.ID, role)
 }
 
-// RequireMembership checks that userID belongs to teamID and returns
-// their role, or domain.ErrForbidden if they don't. Used by other
-// services (tasks, comments, stats) so callers can branch on the role
-// (e.g. creator/assignee vs. plain member permissions).
 func (s *TeamService) RequireMembership(ctx context.Context, teamID, userID int64) (domain.Role, error) {
 	role, err := s.teams.GetMemberRole(ctx, teamID, userID)
 	if errors.Is(err, domain.ErrNotFound) {

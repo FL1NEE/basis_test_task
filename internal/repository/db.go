@@ -3,6 +3,7 @@ package repository
 import (
 	"embed"
 	"fmt"
+	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate/v4"
@@ -19,13 +20,15 @@ func Connect(dsn string) (*sqlx.DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("connect to mysql: %w", err)
 	}
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(10 * time.Minute)
 	return db, nil
 }
 
-// Migrate applies every pending migration embedded in the binary against
-// an already-open connection. Safe to call on every startup: golang-migrate
-// tracks the applied version in a schema_migrations table and is a no-op
-// once the schema is current.
+// Migrate is safe to call on every startup: golang-migrate no-ops once
+// the schema is already current.
 func Migrate(db *sqlx.DB) error {
 	sourceDriver, err := iofs.New(migrationsFS, "migrationsfs")
 	if err != nil {

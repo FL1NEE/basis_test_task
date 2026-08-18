@@ -19,9 +19,7 @@ func NewCommentService(comments *repository.CommentRepo, tasks *repository.TaskR
 	return &CommentService{comments: comments, tasks: tasks, teamSvc: teamSvc}
 }
 
-// AddComment lets any member of the task's team leave a comment - the
-// spec calls out that the assignee may comment, and gives no reason a
-// creator or other teammate following the task shouldn't be able to too.
+// AddComment allows any team member, not just the task's assignee.
 func (s *CommentService) AddComment(ctx context.Context, actingUserID, taskID int64, content string) (*domain.TaskComment, error) {
 	content = strings.TrimSpace(content)
 	if content == "" {

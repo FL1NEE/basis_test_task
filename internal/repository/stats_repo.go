@@ -24,13 +24,8 @@ type statsRow struct {
 	TotalComments    int             `db:"total_comments"`
 }
 
-// statsQuery computes every metric for a single team in one round trip:
-// task counts per status, the top-3 assignees by tasks closed in the last
-// 30 days, the average time-to-close, and the total comment count on the
-// team's tasks. Each CTE is aggregated to a single row and the outer
-// SELECT stitches them together with JSON_OBJECTAGG/JSON_ARRAYAGG so the
-// whole report comes back as one row - no N+1, no application-side
-// fan-out queries.
+// Each CTE reduces to one row; JSON_OBJECTAGG/JSON_ARRAYAGG stitch them
+// into a single result row in one round trip.
 const statsQuery = `
 WITH status_counts AS (
     SELECT status, COUNT(*) AS cnt

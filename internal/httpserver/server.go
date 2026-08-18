@@ -34,6 +34,8 @@ func NewRouter(svc Services, tokens *auth.TokenIssuer) http.Handler {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	mux.Handle("GET /metrics", metricsHandler)
+
 	mux.HandleFunc("GET /openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/yaml")
 		http.ServeFileFS(w, r, docsFS, "openapi.yaml")
@@ -60,5 +62,5 @@ func NewRouter(svc Services, tokens *auth.TokenIssuer) http.Handler {
 
 	mux.Handle("/api/v1/", requireAuth(tokens)(protected))
 
-	return requestLogger(mux)
+	return prometheusMiddleware(requestID(requestLogger(mux)))
 }

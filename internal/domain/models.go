@@ -49,9 +49,7 @@ type Team struct {
 	Name      string    `json:"name" db:"name"`
 	CreatedBy int64     `json:"created_by" db:"created_by"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	// Role is the current user's role in this team. Populated by queries
-	// that list "my teams"; not a column on the teams table itself.
-	Role Role `json:"role,omitempty" db:"role"`
+	Role      Role      `json:"role,omitempty" db:"role"` // caller's role, not a teams column
 }
 
 type TeamMember struct {
@@ -83,8 +81,6 @@ type TaskHistory struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 }
 
-// FieldChange is the shape stored in task_history.changes for every field
-// that was actually modified by an update.
 type FieldChange struct {
 	Old any `json:"old"`
 	New any `json:"new"`

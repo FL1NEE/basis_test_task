@@ -1,14 +1,6 @@
 //go:build integration
 
-// This is the one integration test required by the spec: it exercises
-// the SQL report end to end against a real MySQL instance (via
-// testcontainers-go), not a mock. Run it explicitly with:
-//
-//	go test -tags=integration ./internal/repository/... -run Stats -v
-//
-// It needs a working Docker daemon and is excluded from the default
-// `go test ./...` run so the rest of the suite stays fast and
-// Docker-independent.
+// go test -tags=integration ./internal/repository/... -run Stats -v
 package repository_test
 
 import (
@@ -88,12 +80,6 @@ func TestStatsRepo_GetTeamStats(t *testing.T) {
 	}
 }
 
-// seedStatsFixture creates one team with two users: a creator/owner and
-// an assignee. It inserts 4 tasks (2 done within the last 30 days, 1
-// todo, 1 in_progress), 3 comments, and one closed task from more than
-// 30 days ago that must NOT count toward the "last 30 days" metric -
-// this is the case that would silently pass with a naive query missing
-// the date filter.
 func seedStatsFixture(t *testing.T, db *sqlx.DB) int64 {
 	t.Helper()
 
