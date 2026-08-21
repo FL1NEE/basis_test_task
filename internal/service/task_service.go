@@ -61,9 +61,32 @@ func (s *TaskService) CreateTask(ctx context.Context, actingUserID, teamID int64
 		CreatedBy:   actingUserID,
 		AssigneeID:  assigneeID,
 	}
-	id, err := s.tasks.Create(ctx, task)
+
+	changesJSON, err := json.Marshal(creationChanges(task))
+	if err != nil {
+		return nil, fmt.Errorf("encode task history: %w", err)
+	}
+
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback() //nolint:errcheck // no-op once committed
+
+	txDB := repository.Instrument(tx)
+	taskRepo := repository.NewTaskRepo(txDB)
+	historyRepo := repository.NewHistoryRepo(txDB)
+
+	id, err := taskRepo.Create(ctx, task)
 	if err != nil {
 		return nil, err
+	}
+	if err := historyRepo.Create(ctx, id, actingUserID, string(changesJSON)); err != nil {
+		return nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("commit tx: %w", err)
 	}
 
 	if err := s.cache.InvalidateTeam(ctx, teamID); err != nil {
@@ -71,6 +94,24 @@ func (s *TaskService) CreateTask(ctx context.Context, actingUserID, teamID int64
 	}
 
 	return s.tasks.GetByID(ctx, id)
+}
+
+// creationChanges records the task's initial field values as a
+// {old: null, new: value} history entry, so a task's history is a
+// complete trail from creation onward rather than starting at its first
+// edit.
+func creationChanges(t *domain.Task) map[string]domain.FieldChange {
+	changes := map[string]domain.FieldChange{
+		"title":  {Old: nil, New: t.Title},
+		"status": {Old: nil, New: t.Status},
+	}
+	if t.Description != nil {
+		changes["description"] = domain.FieldChange{Old: nil, New: *t.Description}
+	}
+	if t.AssigneeID != nil {
+		changes["assignee_id"] = domain.FieldChange{Old: nil, New: *t.AssigneeID}
+	}
+	return changes
 }
 
 type ListTasksParams struct {
