@@ -57,8 +57,8 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, tokens)
 	teamSvc := service.NewTeamService(db, teamRepo, userRepo)
 	taskSvc := service.NewTaskService(db, taskRepo, historyRepo, teamSvc, taskCache)
-	commentSvc := service.NewCommentService(commentRepo, taskRepo, teamSvc)
-	historySvc := service.NewHistoryService(historyRepo, taskRepo, teamSvc)
+	commentSvc := service.NewCommentService(commentRepo, taskSvc)
+	historySvc := service.NewHistoryService(historyRepo, taskSvc)
 	statsSvc := service.NewStatsService(statsRepo, teamSvc)
 
 	router := httpserver.NewRouter(httpserver.Services{

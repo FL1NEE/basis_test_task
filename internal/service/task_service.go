@@ -37,14 +37,33 @@ func NewTaskService(
 	return &TaskService{db: db, tasks: tasks, history: history, teamSvc: teamSvc, cache: taskCache}
 }
 
+// GetVisibleTask is the single place that resolves "does this task exist,
+// and can this user see it" - every task-scoped endpoint (comments,
+// history, update) must go through it rather than re-implementing the
+// lookup+membership check itself. Non-existence and non-membership
+// deliberately collapse into the same domain.ErrNotFound (see
+// requireTaskTeamMembership) so callers outside a task's team can't tell
+// the two apart.
+func (s *TaskService) GetVisibleTask(ctx context.Context, actingUserID, taskID int64) (*domain.Task, domain.Role, error) {
+	task, err := s.tasks.GetByID(ctx, taskID)
+	if err != nil {
+		return nil, "", err
+	}
+	role, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID)
+	if err != nil {
+		return nil, "", err
+	}
+	return task, role, nil
+}
+
 func (s *TaskService) CreateTask(ctx context.Context, actingUserID, teamID int64, title string, description *string, assigneeID *int64) (*domain.Task, error) {
+	if _, err := s.teamSvc.RequireMembership(ctx, teamID, actingUserID); err != nil {
+		return nil, err
+	}
+
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return nil, fmt.Errorf("%w: title is required", domain.ErrValidation)
-	}
-
-	if _, err := s.teamSvc.RequireMembership(ctx, teamID, actingUserID); err != nil {
-		return nil, err
 	}
 
 	if assigneeID != nil {
@@ -190,18 +209,13 @@ func (p TaskPatch) empty() bool {
 }
 
 func (s *TaskService) UpdateTask(ctx context.Context, actingUserID, taskID int64, expectedVersion int, patch TaskPatch) (*domain.Task, error) {
+	current, role, err := s.GetVisibleTask(ctx, actingUserID, taskID)
+	if err != nil {
+		return nil, err
+	}
+
 	if patch.empty() {
 		return nil, fmt.Errorf("%w: no fields to update", domain.ErrValidation)
-	}
-
-	current, err := s.tasks.GetByID(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-
-	role, err := requireTaskTeamMembership(s.teamSvc, ctx, current.TeamID, actingUserID)
-	if err != nil {
-		return nil, err
 	}
 
 	switch taskEditAccess(role, current, actingUserID) {

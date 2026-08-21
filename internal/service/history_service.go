@@ -9,20 +9,15 @@ import (
 
 type HistoryService struct {
 	history *repository.HistoryRepo
-	tasks   *repository.TaskRepo
-	teamSvc *TeamService
+	tasks   *TaskService
 }
 
-func NewHistoryService(history *repository.HistoryRepo, tasks *repository.TaskRepo, teamSvc *TeamService) *HistoryService {
-	return &HistoryService{history: history, tasks: tasks, teamSvc: teamSvc}
+func NewHistoryService(history *repository.HistoryRepo, tasks *TaskService) *HistoryService {
+	return &HistoryService{history: history, tasks: tasks}
 }
 
 func (s *HistoryService) ListHistory(ctx context.Context, actingUserID, taskID int64) ([]domain.TaskHistory, error) {
-	task, err := s.tasks.GetByID(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID); err != nil {
+	if _, _, err := s.tasks.GetVisibleTask(ctx, actingUserID, taskID); err != nil {
 		return nil, err
 	}
 

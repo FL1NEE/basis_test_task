@@ -11,27 +11,22 @@ import (
 
 type CommentService struct {
 	comments *repository.CommentRepo
-	tasks    *repository.TaskRepo
-	teamSvc  *TeamService
+	tasks    *TaskService
 }
 
-func NewCommentService(comments *repository.CommentRepo, tasks *repository.TaskRepo, teamSvc *TeamService) *CommentService {
-	return &CommentService{comments: comments, tasks: tasks, teamSvc: teamSvc}
+func NewCommentService(comments *repository.CommentRepo, tasks *TaskService) *CommentService {
+	return &CommentService{comments: comments, tasks: tasks}
 }
 
 // AddComment allows any team member, not just the task's assignee.
 func (s *CommentService) AddComment(ctx context.Context, actingUserID, taskID int64, content string) (*domain.TaskComment, error) {
+	if _, _, err := s.tasks.GetVisibleTask(ctx, actingUserID, taskID); err != nil {
+		return nil, err
+	}
+
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return nil, fmt.Errorf("%w: comment content is required", domain.ErrValidation)
-	}
-
-	task, err := s.tasks.GetByID(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID); err != nil {
-		return nil, err
 	}
 
 	id, err := s.comments.Create(ctx, taskID, actingUserID, content)
@@ -43,11 +38,7 @@ func (s *CommentService) AddComment(ctx context.Context, actingUserID, taskID in
 }
 
 func (s *CommentService) ListComments(ctx context.Context, actingUserID, taskID int64) ([]domain.TaskComment, error) {
-	task, err := s.tasks.GetByID(ctx, taskID)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID); err != nil {
+	if _, _, err := s.tasks.GetVisibleTask(ctx, actingUserID, taskID); err != nil {
 		return nil, err
 	}
 

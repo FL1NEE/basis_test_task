@@ -56,10 +56,6 @@ func (s *TeamService) ListMyTeams(ctx context.Context, userID int64) ([]domain.T
 // InviteMember never grants or touches the owner role - ownership
 // transfer is out of scope.
 func (s *TeamService) InviteMember(ctx context.Context, actingUserID, teamID int64, targetEmail string, role domain.Role) error {
-	if !role.Valid() || role == domain.RoleOwner {
-		return fmt.Errorf("%w: invalid role for invite", domain.ErrValidation)
-	}
-
 	actingRole, err := s.teams.GetMemberRole(ctx, teamID, actingUserID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -69,6 +65,10 @@ func (s *TeamService) InviteMember(ctx context.Context, actingUserID, teamID int
 	}
 	if actingRole != domain.RoleOwner && actingRole != domain.RoleAdmin {
 		return domain.ErrForbidden
+	}
+
+	if !role.Valid() || role == domain.RoleOwner {
+		return fmt.Errorf("%w: invalid role for invite", domain.ErrValidation)
 	}
 
 	target, err := s.users.GetByEmail(ctx, targetEmail)
