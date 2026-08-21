@@ -40,20 +40,11 @@ func NewTaskService(
 // GetVisibleTask is the single place that resolves "does this task exist,
 // and can this user see it" - every task-scoped endpoint (comments,
 // history, update) must go through it rather than re-implementing the
-// lookup+membership check itself. Non-existence and non-membership
-// deliberately collapse into the same domain.ErrNotFound (see
-// requireTaskTeamMembership) so callers outside a task's team can't tell
-// the two apart.
+// lookup+membership check itself. It's a thin pass-through to the
+// repository, which does the existence+membership check as one JOIN
+// query (see TaskRepo.GetVisibleByID) instead of two round trips.
 func (s *TaskService) GetVisibleTask(ctx context.Context, actingUserID, taskID int64) (*domain.Task, domain.Role, error) {
-	task, err := s.tasks.GetByID(ctx, taskID)
-	if err != nil {
-		return nil, "", err
-	}
-	role, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID)
-	if err != nil {
-		return nil, "", err
-	}
-	return task, role, nil
+	return s.tasks.GetVisibleByID(ctx, taskID, actingUserID)
 }
 
 func (s *TaskService) CreateTask(ctx context.Context, actingUserID, teamID int64, title string, description *string, assigneeID *int64) (*domain.Task, error) {

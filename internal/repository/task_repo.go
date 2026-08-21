@@ -51,6 +51,34 @@ func (r *TaskRepo) GetByID(ctx context.Context, id int64) (*domain.Task, error) 
 	return &t, nil
 }
 
+// GetVisibleByID resolves a task only if userID is a member of its team,
+// in one round trip. A task that exists but belongs to a team userID
+// isn't on is indistinguishable from one that doesn't exist at all -
+// both come back as domain.ErrNotFound - so callers can't enumerate
+// task IDs belonging to other teams by diffing error responses.
+func (r *TaskRepo) GetVisibleByID(ctx context.Context, taskID, userID int64) (*domain.Task, domain.Role, error) {
+	var row struct {
+		domain.Task
+		Role domain.Role `db:"member_role"`
+	}
+	err := r.db.GetContext(ctx, &row,
+		`SELECT t.id, t.team_id, t.title, t.description, t.status, t.created_by,
+		        t.assignee_id, t.created_at, t.updated_at, t.closed_at, t.version,
+		        tm.role AS member_role
+		 FROM tasks t
+		 JOIN team_members tm ON tm.team_id = t.team_id AND tm.user_id = ?
+		 WHERE t.id = ?`,
+		userID, taskID,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, "", domain.ErrNotFound
+	}
+	if err != nil {
+		return nil, "", fmt.Errorf("get visible task: %w", err)
+	}
+	return &row.Task, row.Role, nil
+}
+
 type TaskFilter struct {
 	TeamID     int64
 	Status     *domain.TaskStatus
