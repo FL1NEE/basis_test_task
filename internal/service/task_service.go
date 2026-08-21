@@ -199,7 +199,7 @@ func (s *TaskService) UpdateTask(ctx context.Context, actingUserID, taskID int64
 		return nil, err
 	}
 
-	role, err := s.teamSvc.RequireMembership(ctx, current.TeamID, actingUserID)
+	role, err := requireTaskTeamMembership(s.teamSvc, ctx, current.TeamID, actingUserID)
 	if err != nil {
 		return nil, err
 	}

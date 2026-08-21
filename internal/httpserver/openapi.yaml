@@ -204,6 +204,10 @@ paths:
   /tasks/{id}/history:
     get:
       summary: Task change history
+      description: >
+        404 covers both "no such task" and "task exists but you're not on
+        its team" - the two are indistinguishable by design, so a caller
+        can't enumerate task IDs belonging to other teams.
       parameters:
         - $ref: '#/components/parameters/TaskIdPath'
       responses:
@@ -215,7 +219,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/TaskHistoryEntry' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /tasks/{id}/comments:
     post:
@@ -239,7 +243,7 @@ paths:
               schema: { $ref: '#/components/schemas/Comment' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
     get:
       summary: List comments on a task
       parameters:
@@ -253,7 +257,7 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/Comment' }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
 components:
   securitySchemes:

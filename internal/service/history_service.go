@@ -22,7 +22,7 @@ func (s *HistoryService) ListHistory(ctx context.Context, actingUserID, taskID i
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.teamSvc.RequireMembership(ctx, task.TeamID, actingUserID); err != nil {
+	if _, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID); err != nil {
 		return nil, err
 	}
 

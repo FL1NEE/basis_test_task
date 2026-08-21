@@ -30,7 +30,7 @@ func (s *CommentService) AddComment(ctx context.Context, actingUserID, taskID in
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.teamSvc.RequireMembership(ctx, task.TeamID, actingUserID); err != nil {
+	if _, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID); err != nil {
 		return nil, err
 	}
 
@@ -47,7 +47,7 @@ func (s *CommentService) ListComments(ctx context.Context, actingUserID, taskID 
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.teamSvc.RequireMembership(ctx, task.TeamID, actingUserID); err != nil {
+	if _, err := requireTaskTeamMembership(s.teamSvc, ctx, task.TeamID, actingUserID); err != nil {
 		return nil, err
 	}
 
